@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Leicester to Nottingham — FPV Drive & Park</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top Route & Status Bar -->
+    <header id="hud-top" class="hud hidden">
+      <div class="hud-card route-card">
+        <div class="route-endpoints">
+          <span class="city-badge">LEICESTER</span>
+          <div class="route-track">
+            <div id="route-progress-fill" class="route-progress-fill"></div>
+            <div id="route-car-dot" class="route-car-dot"></div>
+          </div>
+          <span class="city-badge">NOTTINGHAM</span>
+        </div>
+        <div class="route-meta">
+          <span id="zone-label">Leicester City Centre</span>
+          <span id="distance-remaining">26.0 mi to Car Park</span>
+        </div>
+      </div>
+
+      <div class="hud-card speed-limit-card">
+        <div class="uk-speed-sign">
+          <span id="speed-limit-value">30</span>
+        </div>
+        <div class="hud-sub-stats">
+          <span id="timer-value">00:00</span>
+          <span id="integrity-value">Hull 100%</span>
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <button id="btn-radio" class="icon-btn" title="Car Radio On/Off or Load MP3 (N)">📻</button>
+        <button id="btn-mute" class="icon-btn" title="Mute / Unmute (M)">🔊</button>
+        <button id="btn-pause" class="icon-btn" title="Pause (P)">⏸</button>
+      </div>
+    </header>
+
+    <!-- Dynamic Warning Banner (Brake stiffening, red light, car park level) -->
+    <div id="alert-banner" class="alert-banner hidden">
+      <span id="alert-icon">⚠</span>
+      <span id="alert-text">BRAKE SERVO STIFFENING — INCREASE REACTION TIME</span>
+    </div>
+
+    <!-- Bottom Minimal Windscreen HUD (above the bonnet) -->
+    <footer id="hud-bottom" class="hud hidden">
+      <div class="hud-card gauge-card">
+        <div class="speed-readout">
+          <span id="speed-value">0</span>
+          <span class="unit">MPH</span>
+        </div>
+        <div class="gear-badge" id="gear-value">D</div>
+      </div>
+
+      <div class="hud-card brake-card">
+        <div class="brake-header">
+          <span class="brake-title">BRAKE SERVO</span>
+          <span id="brake-status-text" class="brake-status good">RESPONSIVE</span>
+        </div>
+        <!-- Dual bar: outline = pedal press, solid fill = actual hydraulic bite -->
+        <div class="brake-bite-bar" title="Pedal demand vs actual hydraulic brake bite">
+          <div id="brake-demand-fill" class="brake-demand-fill"></div>
+          <div id="brake-actual-fill" class="brake-actual-fill"></div>
+        </div>
+        <div class="brake-footer">
+          <span>Servo: <strong id="brake-efficiency-pct">100%</strong></span>
+          <span>Lag: <strong id="brake-lag-sec">0.05s</strong></span>
+        </div>
+      </div>
+
+      <div class="hud-card carpark-sensor hidden" id="parking-sensor-card">
+        <div class="sensor-title">PARKING ASSIST</div>
+        <div class="sensor-bars" id="sensor-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="sensor-hint" id="parking-hint">Approach Bay 14</div>
+      </div>
+    </footer>
+
+    <!-- Touch Controls (shown on coarse pointer or toggle) -->
+    <div id="touch-controls" class="touch-controls hidden">
+      <div class="touch-left">
+        <button id="touch-left" class="touch-btn">◀</button>
+        <button id="touch-right" class="touch-btn">▶</button>
+      </div>
+      <div class="touch-right">
+        <button id="touch-brake" class="touch-btn brake">BRAKE</button>
+        <button id="touch-gas" class="touch-btn gas">GAS</button>
+      </div>
+    </div>
+
+    <!-- Start / Briefing Overlay -->
+    <section id="overlay-start" class="overlay">
+      <div class="modal-card">
+        <div class="uk-plate">M1 / A46 NORTHBOUND</div>
+        <h1>Leicester → Nottingham</h1>
+        <p class="subtitle">First-Person Bonnet View • Multi-Storey Parking Challenge</p>
+
+        <div class="briefing-grid">
+          <div class="brief-item">
+            <h3>The Route</h3>
+            <p>Leave Leicester city streets, join the A46 dual carriageway, cross Trent Bridge into Nottingham, and climb the ramps of the <strong>Broadmarsh Multi-Storey Car Park</strong> to park in <strong>Bay 14 (Level 2)</strong>.</p>
+          </div>
+          <div class="brief-item warning-box">
+            <h3>Brake Failure Warning</h3>
+            <p>Your brakes start sharp and responsive, but the hydraulic booster <strong>progressively stiffens</strong> along the journey—delaying pedal bite and lengthening stopping distances. Watch traffic lights, lorries, and tight car-park pillars!</p>
+          </div>
+        </div>
+
+        <div class="controls-grid">
+          <div><kbd>W</kbd> / <kbd>↑</kbd> Accelerate</div>
+          <div><kbd>S</kbd> / <kbd>↓</kbd> Brake / Hold for Reverse</div>
+          <div><kbd>Space</kbd> Dedicated Brake</div>
+          <div><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> Steer</div>
+          <div><kbd>R</kbd> Toggle Drive / Reverse</div>
+          <div><kbd>M</kbd> Mute • <kbd>N</kbd> Car Radio</div>
+        </div>
+
+        <div class="radio-picker-row">
+          <button id="btn-choose-mp3" type="button" class="secondary-btn small-btn">📻 Choose Radio MP3</button>
+          <span id="radio-status-label" class="radio-status-label">Optional: pick an MP3 or drop <code>audio/radio.mp3</code></span>
+        </div>
+
+        <button id="btn-start" class="primary-btn">Start Engine in Leicester</button>
+      </div>
+    </section>
+
+    <input id="radio-file-input" type="file" accept="audio/*" class="hidden" />
+
+    <!-- Pause Overlay -->
+    <section id="overlay-pause" class="overlay hidden">
+      <div class="modal-card compact">
+        <h2>Journey Paused</h2>
+        <p class="subtitle">Take a breather—keep an eye on those stiffening brakes.</p>
+        <div class="radio-picker-row">
+          <button id="btn-choose-mp3-pause" type="button" class="secondary-btn small-btn">📻 Change Radio MP3</button>
+          <span id="radio-status-pause" class="radio-status-label">No radio track</span>
+        </div>
+        <div class="btn-row">
+          <button id="btn-resume" class="primary-btn">Resume Drive</button>
+          <button id="btn-restart-pause" class="secondary-btn">Restart from Leicester</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- End / Results Overlay -->
+    <section id="overlay-end" class="overlay hidden">
+      <div class="modal-card">
+        <div id="end-badge" class="uk-plate">ARRIVED IN NOTTINGHAM</div>
+        <h1 id="end-title">Parked Cleanly!</h1>
+        <p id="end-subtitle" class="subtitle">You navigated stiff brakes all the way into Level 2, Bay 14.</p>
+        <p id="end-gig-message" class="gig-banner hidden">Congratulations Now Go and Enjoy The Paul Heaton Gig!</p>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Journey Time</span>
+            <strong id="stat-time">00:00</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Parking Precision</span>
+            <strong id="stat-parking">98%</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Vehicle Hull</span>
+            <strong id="stat-hull">100%</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Final Brake Servo</span>
+            <strong id="stat-brakes">28%</strong>
+          </div>
+        </div>
+
+        <button id="btn-restart-end" class="primary-btn">Drive Again</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
